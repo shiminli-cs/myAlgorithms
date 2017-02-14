@@ -1,0 +1,8 @@
+# An Example for testing dispersion
+4, 6
+9, 16
+5, 8
+12, 18
+11, 18
+5, 7
+19, 22
