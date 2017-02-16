@@ -45,7 +45,7 @@ public class Dispersion {
      */
     public static void main(String[] args) {
         boolean cycle = false;
-        
+
         String endpoints[];
         Interval intvl;
         interval_list = new LinkedList<>();
@@ -165,7 +165,7 @@ public class Dispersion {
                     Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 
-                pollLastCriticalList();
+                if (critical_list.size()>1) { pollLastCriticalList(); }
                 critical_list.addLast(iNew);
                 iLast = iNew;
             // the third case
@@ -183,14 +183,27 @@ public class Dispersion {
                 ListIterator<Interval> tl = critical_list.listIterator();
                 tl.next();
                 Interval iSecond = tl.next();
+                int rCnt = 0;
                 while (critical_list.size()>2 &&
                        ((iLast.getRightEndpoint()-iFirst.getLeftEndpoint())
                        /(iLast.getIndex() - iFirst.getIndex())) <= 
                        ((iSecond.getLeftEndpoint()-iFirst.getLeftEndpoint())
                        /(iSecond.getIndex() - iFirst.getIndex()))) {
-                    pollCriticalList();
+                    try {
+                        iSecond.setPoint(iSecond.getLeftEndpoint());
+                    } catch (NotOnIntervalException ex) {
+                        Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    setFinalPosition(iFirst, iSecond);
+                    rCnt++;
                     iFirst = iSecond;
                     iSecond = tl.next();
+                }
+                
+                tl = critical_list.listIterator();
+                while (rCnt-- != 0) {
+                    tl.next();
+                    tl.remove();
                 }
                 
                 dmin = (iLast.getRightEndpoint()-iFirst.getLeftEndpoint())
@@ -210,29 +223,21 @@ public class Dispersion {
         return it;
     }
     
-    private static void pollCriticalList() {
+    private static void setFinalPosition(Interval ci1, Interval ci2) {
         double d;
-        Interval ci1, ci2, it;
-        
-        ci1 = critical_list.poll();
-        ci2 = critical_list.peek();
-        
+        Interval it;
+
         d = (ci2.getLeftEndpoint()-ci1.getLeftEndpoint()) /
             (ci2.getIndex()-ci1.getIndex());
-        
-        if (d<dmin) {dmin = d;}
-        
+
+        it = done_intvl.next();
         do {
-            it = done_intvl.next();
             try {
-                if (it == ci2) {
-                    it.setPoint(it.getLeftEndpoint());  // let p right on the left endpoint
-                } else {
-                    it.setPoint(ci1.getLeftEndpoint()+d*(it.getIndex()-ci1.getIndex()));
-                }
+                it.setPoint(ci1.getLeftEndpoint()+d*(it.getIndex()-ci1.getIndex()));
             } catch (NotOnIntervalException ex) {
                 Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, null, ex);
             }
+            it = done_intvl.next();
         } while (it != ci2);
     }
     
