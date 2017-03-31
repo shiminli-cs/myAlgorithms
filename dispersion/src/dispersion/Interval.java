@@ -32,6 +32,12 @@ public class Interval implements Comparable<Interval>{
         p = l;      // initialize the position of p on the interval
     }
 
+    public void shift(double d) {
+        leftEndpoint += d;
+        rightEndpoint += d;
+        p += d;
+    }
+    
     public void setIndex(int i) {
         index = i;
     }
@@ -62,11 +68,9 @@ public class Interval implements Comparable<Interval>{
 
     @Override
     public int compareTo(Interval intvl) {
-        if(Math.abs(leftEndpoint-intvl.getLeftEndpoint())
-                           >= Constants.EQUALITY_TOLERANCE) {
+        if(!Constants.tolerantEqual(leftEndpoint, intvl.getLeftEndpoint())) {
             return leftEndpoint - intvl.getLeftEndpoint() < 0 ? -1 : 1;
-        } else if(Math.abs(rightEndpoint-intvl.getRightEndpoint())
-                           >= Constants.EQUALITY_TOLERANCE) {
+        } else if(!Constants.tolerantEqual(rightEndpoint, intvl.getRightEndpoint())) {
             return rightEndpoint - intvl.getRightEndpoint() < 0 ? -1 : 1;
         } else {
             return 0;

@@ -32,7 +32,9 @@ public class Dispersion {
     private static ListIterator<Interval> cur_intvl;
     private static ListIterator<Interval> done_intvl;
     private static Interval iFirst, iLast, iNew;
+    private static double cycle_length;
     private static double dmin;
+    private static int intvl_cnt;
     
     public Dispersion() {}
     
@@ -55,7 +57,10 @@ public class Dispersion {
             return;
         }
 
-        if (args.length == 2) { cycle = true; }
+        if (args.length == 2) {
+            cycle = true;
+            cycle_length = Double.parseDouble(args[1]);
+        }
         
         try {
             // Open the file containing the input data
@@ -64,6 +69,7 @@ public class Dispersion {
             DataInputStream in = new DataInputStream(finput);
             BufferedReader br = new BufferedReader(new InputStreamReader(in));
             String strLine;
+            intvl_cnt = 0;
             // Read File Line By Line
             while ((strLine = br.readLine()) != null)   {
                 if (strLine.charAt(0) != '#') {
@@ -77,6 +83,7 @@ public class Dispersion {
                     interval_list.add(
                                 new Interval(Double.parseDouble(endpoints[0]),
                                              Double.parseDouble(endpoints[1])));
+                    intvl_cnt++;
                 }
             }
             in.close();
@@ -107,19 +114,27 @@ public class Dispersion {
             System.out.println(it.getLeftEndpoint() + " -- " + it.getRightEndpoint());
         }
         
-        // run the first round as it is a line version
+        // Initialization
+        if (cycle) {
+            // check whether the coordinate of the last point is larger than
+            // the length of the cycle here
+            cycle_prep();
+            dmin = cycle_length/intvl_cnt;
+        }
+        
+        // run the line version algorithm
         critical_list = new LinkedList<>();
         cur_intvl = interval_list.listIterator();
         done_intvl = interval_list.listIterator();
 
-        // Initialization
-        
         if (cur_intvl.hasNext()) {
             iFirst = getNextwIndex(cur_intvl);
         } else {
             System.out.println("No interval in the input.");
             return;
         }
+        
+        critical_list.addLast(iFirst);
         
         if (cur_intvl.hasNext()) {
             iLast = getNextwIndex(cur_intvl);
@@ -128,25 +143,32 @@ public class Dispersion {
             return;
         }
 
-        dmin = iLast.getRightEndpoint() - iFirst.getLeftEndpoint();
+        if (!cycle) { dmin = iLast.getRightEndpoint()-iFirst.getLeftEndpoint(); }
         
         try {
             iFirst.setPoint(iFirst.getLeftEndpoint());
-            iLast.setPoint(iLast.getRightEndpoint());
+            if (cycle && iFirst.getPoint()+dmin <= iLast.getLeftEndpoint()) {
+                iLast.setPoint(iLast.getLeftEndpoint());
+                clearCriticalList();
+                iFirst = iLast;
+            } else if (cycle && iFirst.getPoint()+dmin <= iLast.getRightEndpoint()) {
+                iLast.setPoint(iFirst.getPoint()+dmin);
+            } else {
+                iLast.setPoint(iLast.getRightEndpoint());
+                dmin = iLast.getRightEndpoint()-iFirst.getLeftEndpoint();
+            }
         } catch (NotOnIntervalException ex) {
             Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        
-        critical_list.addLast(iFirst);
         critical_list.addLast(iLast);
         
         // the main process
         while (cur_intvl.hasNext()) {
             iNew = getNextwIndex(cur_intvl);
             
-            // the first case
             if (iLast.getPoint()+dmin <= iNew.getLeftEndpoint()) {
+            // the first case
                 try {
                     iNew.setPoint(iNew.getLeftEndpoint());
                 } catch (NotOnIntervalException ex) {
@@ -157,8 +179,8 @@ public class Dispersion {
                 critical_list.addFirst(iNew);
                 iFirst = iNew;
                 iLast = iNew;
-            // the second case
             } else if (iLast.getPoint()+dmin <= iNew.getRightEndpoint()) {
+            // the second case
                 try {
                     iNew.setPoint(iLast.getPoint()+dmin);
                 } catch (NotOnIntervalException ex) {
@@ -168,8 +190,7 @@ public class Dispersion {
                 if (critical_list.size()>1) { pollLastCriticalList(); }
                 critical_list.addLast(iNew);
                 iLast = iNew;
-            // the third case
-            } else {
+            } else {    // the third case
                 try {
                     iNew.setPoint(iNew.getRightEndpoint());
                 } catch (NotOnIntervalException ex) {
@@ -210,8 +231,9 @@ public class Dispersion {
                        /(iLast.getIndex() - iFirst.getIndex());
             }
         }
-        
+                
         clearCriticalList();
+        if (cycle) { trim(); }
         output();
     }
     
@@ -263,7 +285,14 @@ public class Dispersion {
                         it.setPoint(iFirst.getLeftEndpoint()+d*(it.getIndex()-iFirst.getIndex()));
                     }
                 } catch (NotOnIntervalException ex) {
-                    Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, null, ex);
+                    String err_msg = "Left: " + it.getLeftEndpoint() +
+                                     " Right: " + it.getRightEndpoint() +
+                                     " Point: " + (iFirst.getLeftEndpoint()+d*(it.getIndex()-iFirst.getIndex()) +
+                                     " First.Index: " + iFirst.getIndex() +
+                                     " First.Left: " + iFirst.getLeftEndpoint() +
+                                     " Index: " + it.getIndex() +
+                                     " d=" + d);
+                    Logger.getLogger(Dispersion.class.getName()).log(Level.SEVERE, err_msg, ex);
                 }
             } while (it != iLast);
         } else {    // critical_list.size() == 1
@@ -314,6 +343,58 @@ public class Dispersion {
             System.out.println("["+iFirst.getLeftEndpoint()+", "
                               +iFirst.getRightEndpoint()+"] P: "
                               +iFirst.getPoint());
+        }
+    }
+    
+    private static void cycle_prep() {
+        LinkedList<Interval> duplication;
+        ListIterator<Interval> cur;
+        Interval i;
+        
+        duplication = new LinkedList<>(interval_list);
+        cur = duplication.listIterator();
+        
+        while (cur.hasNext()) {
+            i = cur.next();
+            interval_list.addLast(new Interval(
+                    i.getLeftEndpoint()+cycle_length,
+                    i.getRightEndpoint()+cycle_length));
+        }
+    }
+    
+    private static void trim() {
+        int tail = 0;
+        int i;
+        Interval it;
+        Iterator<Interval> iter = interval_list.descendingIterator();
+        
+        while (iter.hasNext()) {
+            it = iter.next();
+            if (Constants.tolerantEqual(it.getPoint(), it.getRightEndpoint())) {
+                break;
+            }
+            tail++;
+        }
+        
+        i = tail;
+        iter = interval_list.descendingIterator();
+        while (i-- != 0) {
+            iter.next();
+            iter.remove();
+        }
+        
+        i = intvl_cnt - tail;
+        iter = interval_list.listIterator();
+        while (i-- != 0) {
+            iter.next();
+            iter.remove();
+        }
+        
+        i = intvl_cnt - tail;
+        iter = interval_list.descendingIterator();
+        while (i-- != 0) {
+            it = iter.next();
+            it.shift(-cycle_length);
         }
     }
 }

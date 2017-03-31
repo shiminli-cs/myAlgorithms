@@ -12,4 +12,8 @@ package dispersion;
 public class Constants {
     // The minimum value between two different numbers
     public static double EQUALITY_TOLERANCE = 0.000001;
+    
+    public static boolean tolerantEqual (double n1, double n2) {
+        return Math.abs(n1-n2)<=Constants.EQUALITY_TOLERANCE;
+    }
 }
